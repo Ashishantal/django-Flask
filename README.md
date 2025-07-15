@@ -1,5 +1,8 @@
 # django-Flask
 Django and flask project of mine
+## 🎵 Project Preview
+
+![Music Player Screenshot](shot.png)
 
 
  🚀 *Key Features:*
