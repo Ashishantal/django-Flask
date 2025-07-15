@@ -1,3 +1,6 @@
+preview(shot.png);
+
+
 🚀 *Key Features:*
 
 🌐 *Web-based:* Access your music player from anywhere with an internet connection.
