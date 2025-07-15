@@ -1,4 +1,6 @@
-preview(shot.png);
+## 🎵 Project Preview
+
+![Music Player UI](shot.png)
 
 
 🚀 *Key Features:*
