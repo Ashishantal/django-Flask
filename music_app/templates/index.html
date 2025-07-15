@@ -1,0 +1,260 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MyMusic</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=My+Soul&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="background-cd-container">
+        <img src="{% static 'images/cd (1).png' %}" alt="background cd" class="background-cd">
+    </div>
+
+    <!-- Intro Animation -->
+    <div class="intro-overlay">
+        <img src="{% static 'images/cd (1).png' %}" alt="Intro Logo">
+    </div>
+
+    <!-- Main Layout -->
+    <div class="container">
+        <nav class="main-heading">
+            <img src="{% static 'images/cd (1).png' %}" alt="logo" class="heading-logo">
+            <h1><span class="word-1">CD</span> <span class="word-2">MuSiC</span></h1>
+        </nav>
+        <div class="left-content">
+            {% with first_song=page_obj.object_list.0 %}
+            <div class="card song-card" style="width: 18rem;">
+                <img src="{{ first_song.image.url }}" class="card-img-top" id="player-image" alt="{{ first_song.title }}">
+                <div class="card-body">
+                    <h5 class="card-title" id="player-title">{{ first_song.title }}</h5>
+                    <div class="progress-container" id="player-progress-container">
+                        <div class="progress" id="player-progress"></div>
+                    </div>
+                    <div class="time-container">
+                        <span class="current-time" id="player-current-time">0:00</span>
+                        <span class="total-duration" id="player-total-duration">0:00</span>
+                    </div>
+                    <button class="btn btn-primary play-pause-btn" data-song-id="{{ first_song.id }}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                </div>
+            </div>
+            {% endwith %}
+        </div>
+        <div class="visualizer-container">
+            <canvas id="visualizer"></canvas>
+        </div>
+        <div class="right-content">
+            <div class="playlist-container">
+                <button class="arrow-btn up-arrow"><i class="fas fa-chevron-up"></i></button>
+                <div class="playlist">
+                    <h3 class="playlist-title">All Songs From CD MuSiC</h3>
+                    <ul class="list-group">
+                        {% for song in all_songs %}
+                        <li class="list-group-item playlist-item" data-song-id="{{ song.id }}" data-song-title="{{ song.title }}" data-song-image="{{ song.image.url }}" data-song-audio="{{ song.audio_file.url }}">
+                            <img src="{{ song.image.url }}" alt="{{ song.title }}" class="playlist-item-image">
+                            <span class="playlist-item-title">{{ song.title }}</span>
+                            <span class="playlist-item-duration">{{ song.duration }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <button class="arrow-btn down-arrow"><i class="fas fa-chevron-down"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const playPauseBtn = document.querySelector('.play-pause-btn');
+            const playlist = document.querySelector('.playlist .list-group');
+            const playlistItems = document.querySelectorAll('.playlist-item');
+            const upArrow = document.querySelector('.up-arrow');
+            const downArrow = document.querySelector('.down-arrow');
+            
+            const playerImage = document.getElementById('player-image');
+            const playerTitle = document.getElementById('player-title');
+            const progressContainer = document.getElementById('player-progress-container');
+            const progress = document.getElementById('player-progress');
+            const currentTimeEl = document.getElementById('player-current-time');
+            const totalDurationEl = document.getElementById('player-total-duration');
+
+            let currentAudio = new Audio();
+            let isPlaying = false;
+            let currentIndex = 0;
+            const visibleItems = 5;
+
+            // Visualizer setup
+            const canvas = document.getElementById('visualizer');
+            const canvasCtx = canvas.getContext('2d');
+            let audioCtx;
+            let analyser;
+            let source;
+            let bufferLength;
+            let dataArray;
+
+            function setupVisualizer() {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioCtx.createAnalyser();
+                    source = audioCtx.createMediaElementSource(currentAudio);
+                    source.connect(analyser);
+                    analyser.connect(audioCtx.destination);
+                }
+                
+                analyser.fftSize = 256;
+                bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+            }
+            
+            function drawVisualizer() {
+                requestAnimationFrame(drawVisualizer);
+
+                if (!analyser) return;
+
+                analyser.getByteFrequencyData(dataArray);
+
+                canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    barHeight = dataArray[i];
+                    
+                    const blue = 'rgb(5, 204, 240)';
+                    const pink = 'rgb(255, 6, 143)';
+                    
+                    canvasCtx.fillStyle = i % 2 === 0 ? blue : pink;
+                    canvasCtx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight);
+
+                    x += barWidth + 1;
+                }
+            }
+
+
+            function formatTime(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+
+            function loadSong(songData) {
+                playerTitle.textContent = songData.title;
+                playerImage.src = songData.image;
+                currentAudio.src = songData.audio;
+                playPauseBtn.dataset.songId = songData.id;
+            }
+
+            function playSong() {
+                if (!audioCtx) {
+                    setupVisualizer();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                isPlaying = true;
+                currentAudio.play();
+                playPauseBtn.querySelector('i').classList.replace('fa-play', 'fa-pause');
+                drawVisualizer();
+            }
+
+            function pauseSong() {
+                isPlaying = false;
+                currentAudio.pause();
+                playPauseBtn.querySelector('i').classList.replace('fa-pause', 'fa-play');
+            }
+            
+            function updatePlaylistView() {
+                playlistItems.forEach((item, index) => {
+                    if (index >= currentIndex && index < currentIndex + visibleItems) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+                upArrow.disabled = currentIndex === 0;
+                downArrow.disabled = currentIndex >= playlistItems.length - visibleItems;
+            }
+
+            playlistItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const songData = {
+                        id: this.dataset.songId,
+                        title: this.dataset.songTitle,
+                        image: this.dataset.songImage,
+                        audio: this.dataset.songAudio,
+                    };
+                    loadSong(songData);
+                    playSong();
+                });
+            });
+
+            playPauseBtn.addEventListener('click', () => {
+                if (isPlaying) {
+                    pauseSong();
+                } else {
+                    playSong();
+                }
+            });
+
+            currentAudio.addEventListener('timeupdate', (e) => {
+                const { duration, currentTime } = e.srcElement;
+                const progressPercent = (currentTime / duration) * 100;
+                progress.style.width = `${progressPercent}%`;
+                
+                currentTimeEl.textContent = formatTime(currentTime);
+            });
+            
+            currentAudio.addEventListener('loadedmetadata', (e) => {
+                 totalDurationEl.textContent = formatTime(e.srcElement.duration);
+            });
+
+            progressContainer.addEventListener('click', function(e) {
+                const width = this.clientWidth;
+                const clickX = e.offsetX;
+                const duration = currentAudio.duration;
+                currentAudio.currentTime = (clickX / width) * duration;
+            });
+            
+            currentAudio.addEventListener('ended', pauseSong);
+
+            upArrow.addEventListener('click', () => {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    updatePlaylistView();
+                }
+            });
+
+            downArrow.addEventListener('click', () => {
+                if (currentIndex < playlistItems.length - visibleItems) {
+                    currentIndex++;
+                    updatePlaylistView();
+                }
+            });
+
+            // Load the first song initially
+            const firstSong = playlistItems[0];
+            if (firstSong) {
+                 const firstSongData = {
+                    id: firstSong.dataset.songId,
+                    title: firstSong.dataset.songTitle,
+                    image: firstSong.dataset.songImage,
+                    audio: firstSong.dataset.songAudio,
+                };
+                loadSong(firstSongData);
+            }
+            
+            updatePlaylistView();
+        });
+    </script>
+</body>
+</html>
